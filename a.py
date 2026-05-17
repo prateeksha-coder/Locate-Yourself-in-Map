@@ -1,33 +1,66 @@
-from flask import Flask, render_template, request, jsonify
-from geopy.geocoders import Nominatim
+from flask import Flask, render_template, request
+import requests
 
 app = Flask(__name__)
 
-# Initialize Nominatim geolocator (OpenStreetMap)
-geolocator = Nominatim(user_agent="locate_me_app")
+@app.route("/", methods=["GET", "POST"])
+def details():
 
-# Route to serve the main page
-@app.route("/")
-def home():
-	return render_template("index.html")
+    if request.method == "GET":
+        return render_template("index.html")
 
-# Geocoding route to fetch latitude and longitude
-@app.route("/geocode", methods=["POST"])
-def geocode():
-	location = request.json.get("location")
-	if not location:
-		return jsonify({"error": "Location is required"}), 400
+    location = request.form.get("location", "").strip()
 
-	# Geocoding using Geopy (OpenStreetMap)
-	location = geolocator.geocode(location)
-	if location:
-		return jsonify({
-			"latitude": location.latitude,
-			"longitude": location.longitude,
-			"display_name": location.address
-		})
-	else:
-		return jsonify({"error": "Location not found"}), 404
+    if not location:
+        return render_template(
+            "index.html",
+            error="Give the correct location"
+        )
+
+    try:
+
+        url = "https://nominatim.openstreetmap.org/search"
+
+        params = {
+            "q": location,
+            "format": "json",
+            "limit": 1
+        }
+
+        headers = {
+            "User-Agent": "MyFlaskApp/1.0"
+        }
+
+        response = requests.get(
+            url,
+            params=params,
+            headers=headers,
+            timeout=10
+        )
+
+        data_json = response.json()
+
+        if not data_json:
+            return render_template(
+                "index.html",
+                error="Location not found"
+            )
+
+        data = {
+            "latitude": data_json[0]["lat"],
+            "longitude": data_json[0]["lon"]
+        }
+
+        return render_template(
+            "index.html",
+            data=data
+        )
+
+    except Exception as e:
+        return render_template(
+            "index.html",
+            error=str(e)
+        )
 
 if __name__ == "__main__":
-	app.run(debug=True)
+    app.run(debug=True)
